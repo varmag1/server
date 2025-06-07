@@ -1,23 +1,24 @@
-import schema from './schemas/User.js';
+import adminSchema from './schemas/Admin.js';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+
 
 export default class AdminModel {
-    static async createNewUser({ username, password, role }) {
+    static async createNewUser({ email, username, password, role }) {
         const id = Date.now();
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = new schema({
+        const newAdmin = new adminSchema({
+            email,
             username,
             password: hashedPassword,
             role,
             id
         });
-        await newUser.save();
-        return newUser;
+        await newAdmin.save();
+        return newAdmin;
     }
 
     static async getData(username) {
-        const userData = await schema.findOne({ username });
+        const userData = await adminSchema.findOne({ username });
         if (!userData) return null;
         return {
             email: userData.email,
@@ -30,7 +31,7 @@ export default class AdminModel {
 
     static async findUser(username) {
         try {
-            const user = await schema.findOne({ email: username });
+            const user = await adminSchema.findOne({ email: username });
             
             if (!user) {
                 throw new Error("User not found");
