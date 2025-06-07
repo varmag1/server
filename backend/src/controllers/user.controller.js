@@ -1,15 +1,27 @@
-import express from 'express'
-import UserRegister from '../models/UserRegister.js'
+import UserModel from '../models/user.model.js';
 
+export default class UserController {
 
-const getRegister = (req, res) => {
-    try {
-        const {username, password} = req.body;
-        const register = new UserRegister({username, password}).save()
-        .then((result) => {res.send(result)})
-    } catch (error) {
-        res.send(res.json({message: 'error'}))
+    static async registration(req, res) {
+        try {
+            const { email, username, password } = req.body;
+            const savedUser = await UserModel.registration({ email, username, password });
+            res.status(201).json(savedUser);
+        } catch (error) {
+            res.status(500).json({ message: 'Registration failed', error });
+        }
+    };
+
+    static async login(req, res) {
+        try {
+            const { username, password } = req.body;
+            const result = await UserModel.login({ username, password });
+            if (!result) {
+                return res.status(401).json({ message: 'Authentication failed' });
+            }
+            res.json({ message: "Logged in succefully", token: result.token });
+        } catch (error) {
+            res.status(500).json({ message: 'Login failed', error });
+        }
     }
 }
-
-export {getRegister}

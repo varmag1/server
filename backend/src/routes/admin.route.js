@@ -4,4 +4,7 @@ import AdminController from '../controllers/admin.controller.js'
 
 const adminRouter = express.Router()
 
-adminRouter.get('/createNewUser',  AdminController.createNewUser)
+adminRouter.post('/createNewUser', AdminController.createNewUser)
+adminRouter.post('/getData', AdminController.getData)
+
+export default adminRouter
