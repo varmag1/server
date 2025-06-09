@@ -2,15 +2,13 @@ import mongoose from "mongoose";
 
 const Schema = mongoose.Schema;
 
-const UserSchema = new Schema({
+const AdminSchema = new Schema({
     email: {
         type: String,
-        unique: true,
-        required: true
+        unique: true
     },
     username: {
         type: String,
-        unique: true,
         required: true
     },
     password: {
@@ -24,6 +22,6 @@ const UserSchema = new Schema({
     }
 }, {timestamps: false})
 
-const schema = mongoose.model("UserSchema", UserSchema)
+const schema = mongoose.model("AdminSchema", AdminSchema)
 
 export default schema

@@ -1,81 +1,129 @@
-import jwt from 'jsonwebtoken'
-import bcrypt from 'bcryptjs'
-import AdminModel from '../models/admin.model';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import AdminModel from '../models/admin.model.js';
 
 export default class Auth {
 
-    static async generateToken(user) {
-        const token = jwt.sign(user, process.env.JWT_SECRET, {
-            expiresIn: 3 * 24 * 60 * 60,
-        })
-        return token
+    static generateTokens(user) {
+        const payload = {
+            id: user._id,
+            role: user.role,
+            username: user.username,
+        };
+
+        const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
+            expiresIn: '15m',
+        });
+
+        const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
+            expiresIn: '7d',
+        });
+
+        return { accessToken, refreshToken };
     };
 
-    static async verifyToken(req, res, next) {
+    static async refreshAccessToken(req, res) {
         try {
-            const authHeader = req.headers.authorization;
-            if (!authHeader) {
-                return { message: "No authorization header" };
+            const { refreshToken } = req.body;
+
+            if (typeof refreshToken !== "string" || !refreshToken.trim()) {
+                return res.status(400).json({ message: 'Refresh token is missing or invalid' });
             }
 
-            const token = authHeader.split(" ")[1];
-            if (!token) {
-                return { message: "No token provided" };
+            let decoded;
+            try {
+                decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+            } catch (err) {
+                return res.status(403).json({ message: 'Invalid refresh token' });
             }
 
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            if (!decoded) {
-                return { message: "Invalid token" };
-            }
-
-            req.userid = decoded.id;
-            req.userRole = decoded.role;
-            next();
-
-        } catch (error) {
-            next(error);
-        }
-    };
-    
-    static async validateUser(username, password) {
-        try {
-            const user = await AdminModel.findOne({ username: username }).lean();
+            const user = await AdminModel.findById(decoded.id).lean();
 
             if (!user) {
-                return { 
+                return res.status(404).json({ message: 'User not found' });
+            }
+
+            const payload = {
+                id: user._id,
+                role: user.role,
+                username: user.username,
+            };
+
+            const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
+                expiresIn: '15m',
+            });
+
+            return res.json({ accessToken });
+        } catch (error) {
+            return res.status(500).json({ message: 'Internal server error' });
+        }
+    };
+
+    static async validateUser(username, password) {
+        try {
+            const user = await AdminModel.findOne({ username }).lean();
+
+            if (!user) {
+                return {
                     status: "error",
-                    message: "User not found" 
+                    message: "User not found"
                 };
             }
 
             const isPasswordValid = await bcrypt.compare(password, user.password);
 
             if (!isPasswordValid) {
-                return { 
+                return {
                     status: "error",
-                    message: "Invalid password" 
+                    message: "Invalid password"
                 };
             }
 
-            const userWithoutPassword = { ...user };
-            delete userWithoutPassword.password;
-
-            const token = await this.generateToken(userWithoutPassword);
+            const tokens = this.generateTokens(user);
 
             return {
                 status: "success",
                 data: {
-                    ...userWithoutPassword,
-                    token
+                    id: user._id,
+                    username: user.username,
+                    role: user.role,
+                    ...tokens
                 }
             };
-
         } catch (error) {
             console.error('Error validating user:', error);
-            return { 
-                status: "error", 
-                message: "Internal server error" 
+            return {
+                status: "error",
+                message: "Internal server error"
             };
-        }    
-    }
+        }
+    };
+
+    static async verifyToken(req, res, next) {
+        try {
+            const authHeader = req.headers.authorization;
+
+            if (!authHeader) {
+                return res.status(401).json({ message: "No authorization header" })
+            }
+
+            const token = authHeader.split(" ")[1];
+
+            if (!token) {
+                return res.status(401).json({ message: "No token provided" })
+            }
+
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+            req.userid = decoded.id;
+            req.userRole = decoded.role;
+            req.username = decoded.username;
+
+            next();
+
+        } catch (error) {
+            return res.status(401).json({ message: "Invalid or expired token" });
+        }
+    };
+
 }
